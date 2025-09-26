@@ -67,13 +67,7 @@ func (gc *GraphClient) call(req *http.Request) (res *http.Response, err error) {
 		Timeout:   gc.Timeout,
 	}
 
-	if log := gc.Logger; log != nil {
-		log.Debugf("%s %s", req.Method, req.URL)
-	}
-
-	rid := httplog.TraceHttpRequest(gc.Logger, req)
-
-	res, err = client.Do(req)
+	res, err = httplog.TraceClientDo(gc.Logger, client, req)
 	if err != nil {
 		if gc.shouldRetry(err) {
 			err = ret.NewRetryError(err, gc.RetryAfter)
@@ -81,7 +75,6 @@ func (gc *GraphClient) call(req *http.Request) (res *http.Response, err error) {
 		return res, err
 	}
 
-	httplog.TraceHttpResponse(gc.Logger, res, rid)
 	return res, nil
 }
 
