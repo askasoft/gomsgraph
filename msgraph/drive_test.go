@@ -10,6 +10,21 @@ import (
 
 var testSiteDisplayName = "SharePoint連携テスト - テストチャネル"
 
+func TestGetRootSiteDrives(t *testing.T) {
+	gc := testNewGraphClient(t)
+
+	drives, err := gc.GetSiteDrives(context.TODO(), "root", "root")
+	require.NoError(t, err)
+	for j, d := range drives {
+		fmt.Printf("    * #%d %s: %s - %s\n", j, d.ID, d.Name, d.WebURL)
+		require.NotNil(t, d.Root)
+
+		if d.Name == "ドキュメント" {
+			testGetDriveItemChildren(t, gc, 2, d.ID, d.Root.ID)
+		}
+	}
+}
+
 func TestGetSiteDrives(t *testing.T) {
 	gc := testNewGraphClient(t)
 

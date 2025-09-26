@@ -22,8 +22,22 @@ type Sites struct {
 	Values []*Site `json:"value"`
 }
 
+func (gc *GraphClient) GetSite(ctx context.Context, siteID string) (*Site, error) {
+	url := gc.Endpoint("/sites/%s", siteID)
+	site := &Site{}
+	err := gc.DoGet(ctx, url, site)
+	return site, err
+}
+
 func (gc *GraphClient) GetSites(ctx context.Context) ([]*Site, error) {
 	url := gc.Endpoint("/sites")
+	sites := &Sites{}
+	err := gc.DoGet(ctx, url, sites)
+	return sites.Values, err
+}
+
+func (gc *GraphClient) GetSubSites(ctx context.Context, siteID string) ([]*Site, error) {
+	url := gc.Endpoint("/sites/%s/sites", siteID)
 	sites := &Sites{}
 	err := gc.DoGet(ctx, url, sites)
 	return sites.Values, err
