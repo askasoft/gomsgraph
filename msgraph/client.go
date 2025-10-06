@@ -242,6 +242,59 @@ func (gc *GraphClient) doSaveFile(ctx context.Context, url string, path string) 
 	return saveResponse(res, path)
 }
 
+func DoGets[T any](ctx context.Context, gc *GraphClient, url string) ([]T, string, error) {
+	type R struct {
+		NextLink string `json:"@odata.nextLink"`
+		Values   []T    `json:"value"`
+	}
+
+	r := &R{}
+	err := gc.DoGet(ctx, url, r)
+	return r.Values, r.NextLink, err
+}
+
+func DoList[T any](ctx context.Context, gc *GraphClient, url string) (vs []T, err error) {
+	type R struct {
+		NextLink string `json:"@odata.nextLink"`
+		Values   []T    `json:"value"`
+	}
+
+	for url != "" {
+		r := &R{}
+		if err = gc.DoGet(ctx, url, r); err != nil {
+			return
+		}
+
+		vs = append(vs, r.Values...)
+		url = r.NextLink
+	}
+	return
+}
+
+func DoIter[T any](ctx context.Context, gc *GraphClient, url string, itf func(T) error) error {
+	type R struct {
+		NextLink string `json:"@odata.nextLink"`
+		Values   []T    `json:"value"`
+	}
+
+	for url != "" {
+		r := &R{}
+		if err := gc.DoGet(ctx, url, r); err != nil {
+			return err
+		}
+
+		for _, v := range r.Values {
+			if err := itf(v); err != nil {
+				return err
+			}
+		}
+
+		url = r.NextLink
+	}
+
+	return nil
+}
+
 func copyResponse(res *http.Response) ([]byte, error) {
 	defer iox.DrainAndClose(res.Body)
 

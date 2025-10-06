@@ -18,10 +18,6 @@ func (s *Site) String() string {
 	return toString(s)
 }
 
-type Sites struct {
-	Values []*Site `json:"value"`
-}
-
 func (gc *GraphClient) GetSite(ctx context.Context, siteID string) (*Site, error) {
 	url := gc.Endpoint("/sites/%s", siteID)
 	site := &Site{}
@@ -29,16 +25,26 @@ func (gc *GraphClient) GetSite(ctx context.Context, siteID string) (*Site, error
 	return site, err
 }
 
-func (gc *GraphClient) GetSites(ctx context.Context) ([]*Site, error) {
-	url := gc.Endpoint("/sites")
-	sites := &Sites{}
-	err := gc.DoGet(ctx, url, sites)
-	return sites.Values, err
+func (gc *GraphClient) GetSites(ctx context.Context) ([]*Site, string, error) {
+	return DoGets[*Site](ctx, gc, gc.Endpoint("/sites"))
 }
 
-func (gc *GraphClient) GetSubSites(ctx context.Context, siteID string) ([]*Site, error) {
-	url := gc.Endpoint("/sites/%s/sites", siteID)
-	sites := &Sites{}
-	err := gc.DoGet(ctx, url, sites)
-	return sites.Values, err
+func (gc *GraphClient) ListSites(ctx context.Context) ([]*Site, error) {
+	return DoList[*Site](ctx, gc, gc.Endpoint("/sites"))
+}
+
+func (gc *GraphClient) IterSites(ctx context.Context, itf func(*Site) error) error {
+	return DoIter(ctx, gc, gc.Endpoint("/sites"), itf)
+}
+
+func (gc *GraphClient) GetSubSites(ctx context.Context, siteID string) ([]*Site, string, error) {
+	return DoGets[*Site](ctx, gc, gc.Endpoint("/sites/%s/sites", siteID))
+}
+
+func (gc *GraphClient) ListSubSites(ctx context.Context, siteID string) (sites []*Site, err error) {
+	return DoList[*Site](ctx, gc, gc.Endpoint("/sites/%s/sites", siteID))
+}
+
+func (gc *GraphClient) IterSubSites(ctx context.Context, siteID string, itf func(*Site) error) error {
+	return DoIter(ctx, gc, gc.Endpoint("/sites/%s/sites", siteID), itf)
 }

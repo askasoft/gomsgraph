@@ -23,19 +23,24 @@ func (d *Drive) String() string {
 	return toString(d)
 }
 
-type Drives struct {
-	Values []*Drive `json:"value"`
-}
-
-func (gc *GraphClient) GetSiteDrives(ctx context.Context, siteID string, expand ...string) ([]*Drive, error) {
+func (gc *GraphClient) getSiteDrivesURL(siteID string, expand ...string) string {
 	u := gc.Endpoint("/sites/%s/drives", siteID)
 	if len(expand) > 0 {
 		u += "?$expand=" + url.QueryEscape(str.Join(expand, " "))
 	}
+	return u
+}
 
-	drives := &Drives{}
-	err := gc.DoGet(ctx, u, drives)
-	return drives.Values, err
+func (gc *GraphClient) GetSiteDrives(ctx context.Context, siteID string, expand ...string) ([]*Drive, string, error) {
+	return DoGets[*Drive](ctx, gc, gc.getSiteDrivesURL(siteID, expand...))
+}
+
+func (gc *GraphClient) ListSiteDrives(ctx context.Context, siteID string, expand ...string) ([]*Drive, error) {
+	return DoList[*Drive](ctx, gc, gc.getSiteDrivesURL(siteID, expand...))
+}
+
+func (gc *GraphClient) IterSiteDrives(ctx context.Context, siteID string, itf func(*Drive) error, expand ...string) error {
+	return DoIter(ctx, gc, gc.getSiteDrivesURL(siteID, expand...), itf)
 }
 
 type DriveFolder struct {
@@ -59,12 +64,8 @@ type DriveItem struct {
 	LastModifiedDateTime time.Time      `json:"lastModifiedDateTime"`
 }
 
-func (i *DriveItem) String() string {
-	return toString(i)
-}
-
-type DriveItems struct {
-	Values []*DriveItem `json:"value"`
+func (di *DriveItem) String() string {
+	return toString(di)
 }
 
 func (gc *GraphClient) GetDriveRoot(ctx context.Context, driveID string) (*DriveItem, error) {
@@ -74,25 +75,30 @@ func (gc *GraphClient) GetDriveRoot(ctx context.Context, driveID string) (*Drive
 	return item, err
 }
 
-func (gc *GraphClient) GetDriveItemChildren(ctx context.Context, driveID, itemID string, expand ...string) ([]*DriveItem, error) {
+func (gc *GraphClient) getDriveItemChildrenURL(driveID, itemID string, expand ...string) string {
 	u := gc.Endpoint("/drives/%s/items/%s/children", driveID, itemID)
 	if len(expand) > 0 {
 		u += "?$expand=" + url.QueryEscape(str.Join(expand, " "))
 	}
+	return u
+}
 
-	items := &DriveItems{}
-	err := gc.DoGet(ctx, u, items)
-	return items.Values, err
+func (gc *GraphClient) GetDriveItemChildren(ctx context.Context, driveID, itemID string, expand ...string) ([]*DriveItem, string, error) {
+	return DoGets[*DriveItem](ctx, gc, gc.getDriveItemChildrenURL(driveID, itemID, expand...))
+}
+
+func (gc *GraphClient) ListDriveItemChildren(ctx context.Context, driveID, itemID string, expand ...string) ([]*DriveItem, error) {
+	return DoList[*DriveItem](ctx, gc, gc.getDriveItemChildrenURL(driveID, itemID, expand...))
+}
+
+func (gc *GraphClient) IterDriveItemChildren(ctx context.Context, driveID, itemID string, itf func(*DriveItem) error, expand ...string) error {
+	return DoIter(ctx, gc, gc.getDriveItemChildrenURL(driveID, itemID, expand...), itf)
 }
 
 func (gc *GraphClient) GetDriveItemContent(ctx context.Context, driveID, itemID string) ([]byte, error) {
-	u := gc.Endpoint("/drives/%s/items/%s/content", driveID, itemID)
-
-	return gc.DoDownload(ctx, u)
+	return gc.DoDownload(ctx, gc.Endpoint("/drives/%s/items/%s/content", driveID, itemID))
 }
 
 func (gc *GraphClient) SaveDriveItemContent(ctx context.Context, driveID, itemID string, savePath string) error {
-	u := gc.Endpoint("/drives/%s/items/%s/content", driveID, itemID)
-
-	return gc.DoSaveFile(ctx, u, savePath)
+	return gc.DoSaveFile(ctx, gc.Endpoint("/drives/%s/items/%s/content", driveID, itemID), savePath)
 }
