@@ -2,10 +2,7 @@ package msgraph
 
 import (
 	"context"
-	"net/url"
 	"time"
-
-	"github.com/askasoft/pango/str"
 )
 
 type Drive struct {
@@ -23,24 +20,20 @@ func (d *Drive) String() string {
 	return toString(d)
 }
 
-func (gc *GraphClient) getSiteDrivesURL(siteID string, expand ...string) string {
-	u := gc.Endpoint("/sites/%s/drives", siteID)
-	if len(expand) > 0 {
-		u += "?$expand=" + url.QueryEscape(str.Join(expand, " "))
-	}
-	return u
+func (gc *GraphClient) getSiteDrivesURL(siteID string, options ...string) string {
+	return gc.Endpoint("/sites/%s/drives", siteID) + optionsQuery(options...)
 }
 
-func (gc *GraphClient) GetSiteDrives(ctx context.Context, siteID string, expand ...string) ([]*Drive, string, error) {
-	return DoGets[*Drive](ctx, gc, gc.getSiteDrivesURL(siteID, expand...))
+func (gc *GraphClient) GetSiteDrives(ctx context.Context, siteID string, options ...string) ([]*Drive, string, error) {
+	return DoGets[*Drive](ctx, gc, gc.getSiteDrivesURL(siteID, options...))
 }
 
-func (gc *GraphClient) ListSiteDrives(ctx context.Context, siteID string, expand ...string) ([]*Drive, error) {
-	return DoList[*Drive](ctx, gc, gc.getSiteDrivesURL(siteID, expand...))
+func (gc *GraphClient) ListSiteDrives(ctx context.Context, siteID string, options ...string) ([]*Drive, error) {
+	return DoList[*Drive](ctx, gc, gc.getSiteDrivesURL(siteID, options...))
 }
 
-func (gc *GraphClient) IterSiteDrives(ctx context.Context, siteID string, itf func(*Drive) error, expand ...string) error {
-	return DoIter(ctx, gc, gc.getSiteDrivesURL(siteID, expand...), itf)
+func (gc *GraphClient) IterSiteDrives(ctx context.Context, siteID string, itf func(*Drive) error, options ...string) error {
+	return DoIter(ctx, gc, gc.getSiteDrivesURL(siteID, options...), itf)
 }
 
 type DriveFolder struct {
@@ -68,31 +61,28 @@ func (di *DriveItem) String() string {
 	return toString(di)
 }
 
-func (gc *GraphClient) GetDriveRoot(ctx context.Context, driveID string) (*DriveItem, error) {
-	u := gc.Endpoint("/drives/%s/root", driveID)
+func (gc *GraphClient) GetDriveRoot(ctx context.Context, driveID string, options ...string) (*DriveItem, error) {
+	url := gc.Endpoint("/drives/%s/root", driveID) + optionsQuery(options...)
+
 	item := &DriveItem{}
-	err := gc.DoGet(ctx, u, item)
+	err := gc.DoGet(ctx, url, item)
 	return item, err
 }
 
-func (gc *GraphClient) getDriveItemChildrenURL(driveID, itemID string, expand ...string) string {
-	u := gc.Endpoint("/drives/%s/items/%s/children", driveID, itemID)
-	if len(expand) > 0 {
-		u += "?$expand=" + url.QueryEscape(str.Join(expand, " "))
-	}
-	return u
+func (gc *GraphClient) getDriveItemChildrenURL(driveID, itemID string, options ...string) string {
+	return gc.Endpoint("/drives/%s/items/%s/children", driveID, itemID) + optionsQuery(options...)
 }
 
-func (gc *GraphClient) GetDriveItemChildren(ctx context.Context, driveID, itemID string, expand ...string) ([]*DriveItem, string, error) {
-	return DoGets[*DriveItem](ctx, gc, gc.getDriveItemChildrenURL(driveID, itemID, expand...))
+func (gc *GraphClient) GetDriveItemChildren(ctx context.Context, driveID, itemID string, options ...string) ([]*DriveItem, string, error) {
+	return DoGets[*DriveItem](ctx, gc, gc.getDriveItemChildrenURL(driveID, itemID, options...))
 }
 
-func (gc *GraphClient) ListDriveItemChildren(ctx context.Context, driveID, itemID string, expand ...string) ([]*DriveItem, error) {
-	return DoList[*DriveItem](ctx, gc, gc.getDriveItemChildrenURL(driveID, itemID, expand...))
+func (gc *GraphClient) ListDriveItemChildren(ctx context.Context, driveID, itemID string, options ...string) ([]*DriveItem, error) {
+	return DoList[*DriveItem](ctx, gc, gc.getDriveItemChildrenURL(driveID, itemID, options...))
 }
 
-func (gc *GraphClient) IterDriveItemChildren(ctx context.Context, driveID, itemID string, itf func(*DriveItem) error, expand ...string) error {
-	return DoIter(ctx, gc, gc.getDriveItemChildrenURL(driveID, itemID, expand...), itf)
+func (gc *GraphClient) IterDriveItemChildren(ctx context.Context, driveID, itemID string, itf func(*DriveItem) error, options ...string) error {
+	return DoIter(ctx, gc, gc.getDriveItemChildrenURL(driveID, itemID, options...), itf)
 }
 
 func (gc *GraphClient) GetDriveItemContent(ctx context.Context, driveID, itemID string) ([]byte, error) {

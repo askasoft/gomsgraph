@@ -12,7 +12,7 @@ import (
 func TestGetRootSiteDrives(t *testing.T) {
 	gc := testNewGraphClient(t)
 
-	drives, err := gc.ListSiteDrives(context.TODO(), "root", "root")
+	drives, err := gc.ListSiteDrives(context.TODO(), "root", "$expand", "root")
 	require.NoError(t, err)
 	for j, d := range drives {
 		fmt.Printf("    * #%d %s: %s - %s\n", j, d.ID, d.Name, d.WebURL)
@@ -35,7 +35,7 @@ func TestGetSiteDrives(t *testing.T) {
 
 	fmt.Printf("* %s: %s - %s\n", s.ID, s.DisplayName, s.WebURL)
 
-	drives, err := gc.ListSiteDrives(context.TODO(), s.ID, "root")
+	drives, err := gc.ListSiteDrives(context.TODO(), s.ID, "$expand", "root")
 	require.NoError(t, err)
 	for j, d := range drives {
 		fmt.Printf("    * #%d %s: %s - %s\n", j, d.ID, d.Name, d.WebURL)
@@ -47,7 +47,7 @@ func TestGetSiteDrives(t *testing.T) {
 }
 
 func testGetDriveItemChildren(t *testing.T, gc *GraphClient, indent int, driveID, itemID string) {
-	items, err := gc.ListDriveItemChildren(context.TODO(), driveID, itemID, "listItem($expand=fields)")
+	items, err := gc.ListDriveItemChildren(context.TODO(), driveID, itemID, "$expand", "listItem($expand=fields)")
 	require.NoError(t, err)
 
 	for k, f := range items {

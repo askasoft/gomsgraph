@@ -295,6 +295,31 @@ func DoIter[T any](ctx context.Context, gc *GraphClient, url string, itf func(T)
 	return nil
 }
 
+func optionsQuery(options ...string) string {
+	if len(options) == 0 {
+		return ""
+	}
+	return "?" + encodeOptions(options...)
+}
+
+func encodeOptions(options ...string) string {
+	z := len(options)
+	if z == 0 {
+		return ""
+	}
+
+	vs := url.Values{}
+	for i := 0; i < z; i += 2 {
+		k := options[i]
+		v := ""
+		if i+1 < z {
+			v = options[i+1]
+		}
+		vs.Add(k, v)
+	}
+	return vs.Encode()
+}
+
 func copyResponse(res *http.Response) ([]byte, error) {
 	defer iox.DrainAndClose(res.Body)
 
