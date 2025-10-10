@@ -2,6 +2,7 @@ package msgraph
 
 import (
 	"context"
+	"io"
 	"time"
 )
 
@@ -85,8 +86,12 @@ func (gc *GraphClient) IterDriveItemChildren(ctx context.Context, driveID, itemI
 	return DoIter(ctx, gc, gc.getDriveItemChildrenURL(driveID, itemID, options...), itf)
 }
 
-func (gc *GraphClient) GetDriveItemContent(ctx context.Context, driveID, itemID string) ([]byte, error) {
-	return gc.DoDownload(ctx, gc.Endpoint("/drives/%s/items/%s/content", driveID, itemID))
+func (gc *GraphClient) CopyDriveItemContent(ctx context.Context, driveID, itemID string, w io.Writer) error {
+	return gc.DoCopyFile(ctx, gc.Endpoint("/drives/%s/items/%s/content", driveID, itemID), w)
+}
+
+func (gc *GraphClient) ReadDriveItemContent(ctx context.Context, driveID, itemID string) ([]byte, error) {
+	return gc.DoReadFile(ctx, gc.Endpoint("/drives/%s/items/%s/content", driveID, itemID))
 }
 
 func (gc *GraphClient) SaveDriveItemContent(ctx context.Context, driveID, itemID string, savePath string) error {

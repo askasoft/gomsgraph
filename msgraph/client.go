@@ -1,10 +1,10 @@
 package msgraph
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -106,6 +106,13 @@ func (gc *GraphClient) doAuth(ctx context.Context) error {
 	vals.Add("scope", str.IfEmpty(gc.Scope, "https://graph.microsoft.com/.default"))
 
 	url := fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", gc.TenantID)
+	//TODO:
+	// val := urlx.EncodeValues(
+	// 	"client_id", gc.ClientID,
+	// 	"client_secret", gc.ClientSecret,
+	// 	"grant_type", "client_credentials",
+	// 	"scope", str.IfEmpty(gc.Scope, "https://graph.microsoft.com/.default"),
+	// )
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(vals.Encode()))
 	if err != nil {
@@ -183,16 +190,14 @@ func (gc *GraphClient) doGet(ctx context.Context, url string, result any) error 
 	return gc.doCall(ctx, req, result)
 }
 
-func (gc *GraphClient) DoPost(ctx context.Context, url string, params url.Values, result any) error {
+func (gc *GraphClient) DoPost(ctx context.Context, url string, body io.Reader, result any) error {
 	return gc.RetryForError(ctx, func() error {
-		return gc.doPost(ctx, url, params, result)
+		return gc.doPost(ctx, url, body, result)
 	})
 }
 
-func (gc *GraphClient) doPost(ctx context.Context, url string, params url.Values, result any) error {
-	vals := params.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(vals))
+func (gc *GraphClient) doPost(ctx context.Context, url string, body io.Reader, result any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
 	if err != nil {
 		return err
 	}
@@ -200,15 +205,35 @@ func (gc *GraphClient) doPost(ctx context.Context, url string, params url.Values
 	return gc.doCall(ctx, req, result)
 }
 
-func (gc *GraphClient) DoDownload(ctx context.Context, url string) (buf []byte, err error) {
+func (gc *GraphClient) DoCopyFile(ctx context.Context, url string, w io.Writer) error {
+	return gc.RetryForError(ctx, func() error {
+		return gc.doCopyFile(ctx, url, w)
+	})
+}
+
+func (gc *GraphClient) doCopyFile(ctx context.Context, url string, w io.Writer) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+
+	res, err := gc.authAndCall(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return copyResponse(res, w)
+}
+
+func (gc *GraphClient) DoReadFile(ctx context.Context, url string) (buf []byte, err error) {
 	err = gc.RetryForError(ctx, func() error {
-		buf, err = gc.doDownload(ctx, url)
+		buf, err = gc.doReadFile(ctx, url)
 		return err
 	})
 	return
 }
 
-func (gc *GraphClient) doDownload(ctx context.Context, url string) ([]byte, error) {
+func (gc *GraphClient) doReadFile(ctx context.Context, url string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -219,7 +244,7 @@ func (gc *GraphClient) doDownload(ctx context.Context, url string) ([]byte, erro
 		return nil, err
 	}
 
-	return copyResponse(res)
+	return readResponse(res)
 }
 
 func (gc *GraphClient) DoSaveFile(ctx context.Context, url string, path string) error {
@@ -296,6 +321,7 @@ func DoIter[T any](ctx context.Context, gc *GraphClient, url string, itf func(T)
 }
 
 func optionsQuery(options ...string) string {
+	// TODO: return urlx.EncodeQuery(options...)
 	if len(options) == 0 {
 		return ""
 	}
@@ -320,16 +346,25 @@ func encodeOptions(options ...string) string {
 	return vs.Encode()
 }
 
-func copyResponse(res *http.Response) ([]byte, error) {
+func copyResponse(res *http.Response, w io.Writer) error {
+	defer iox.DrainAndClose(res.Body)
+
+	if res.StatusCode != http.StatusOK {
+		return newResultError(res)
+	}
+
+	_, err := io.Copy(w, res.Body)
+	return err
+}
+
+func readResponse(res *http.Response) ([]byte, error) {
 	defer iox.DrainAndClose(res.Body)
 
 	if res.StatusCode != http.StatusOK {
 		return nil, newResultError(res)
 	}
 
-	buf := &bytes.Buffer{}
-	_, err := iox.Copy(buf, res.Body)
-	return buf.Bytes(), err
+	return io.ReadAll(res.Body)
 }
 
 func saveResponse(res *http.Response, path string) error {
@@ -340,11 +375,11 @@ func saveResponse(res *http.Response, path string) error {
 	}
 
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, os.FileMode(0770)); err != nil {
+	if err := os.MkdirAll(dir, 0770); err != nil {
 		return err
 	}
 
-	return fsu.WriteReader(path, res.Body, fsu.FileMode(0660))
+	return fsu.WriteReader(path, res.Body, 0660)
 }
 
 func toString(o any) string {
