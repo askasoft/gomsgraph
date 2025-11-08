@@ -15,12 +15,12 @@ func TestGetSite(t *testing.T) {
 
 	require.NoError(t, err)
 
-	fmt.Printf("* #%d %s: %s - %s\n", 0, s.ID, s.Name, s.WebURL)
+	fmt.Printf("* #%d %s: %s - %s\n", 0, s.ID, s.DisplayName, s.WebURL)
 
 	sss, err := gc.ListSubSites(context.TODO(), s.ID)
 	require.NoError(t, err)
 	for j, ss := range sss {
-		fmt.Printf("    * #%d %s: %s - %s\n", j, ss.ID, ss.Name, ss.WebURL)
+		fmt.Printf("    * #%d %s: %s - %s\n", j, ss.ID, ss.DisplayName, ss.WebURL)
 	}
 }
 
@@ -32,12 +32,12 @@ func TestGetSites(t *testing.T) {
 	require.NoError(t, err)
 
 	for i, s := range sites {
-		fmt.Printf("* #%d %s: %s - %s\n", i, s.ID, s.Name, s.WebURL)
+		fmt.Printf("* #%d %s: %s - %s\n", i, s.ID, s.DisplayName, s.WebURL)
 
 		sss, err := gc.ListSubSites(context.TODO(), s.ID)
 		require.NoError(t, err)
 		for j, ss := range sss {
-			fmt.Printf("    * #%d %s: %s - %s\n", j, ss.ID, ss.Name, ss.WebURL)
+			fmt.Printf("    * #%d %s: %s - %s\n", j, ss.ID, ss.DisplayName, ss.WebURL)
 		}
 	}
 }
