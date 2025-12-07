@@ -42,20 +42,23 @@ func TestGetSiteDrives(t *testing.T) {
 		require.NotNil(t, d.Root)
 
 		fmt.Printf("    * #%d ROOT: %s\n", j, d.Root.ID)
-		testGetDriveItemChildren(t, gc, 2, d.ID, d.Root.ID)
+		err = testGetDriveItemChildren(gc, 2, d.ID, d.Root.ID)
+		require.NoError(t, err)
 	}
 }
 
-func testGetDriveItemChildren(t *testing.T, gc *GraphClient, indent int, driveID, itemID string) {
-	items, err := gc.ListDriveItemChildren(context.TODO(), driveID, itemID, "$expand", "listItem($expand=fields)")
-	require.NoError(t, err)
+func testGetDriveItemChildren(gc *GraphClient, indent int, driveID, itemID string) error {
+	n := 0
 
-	for k, f := range items {
-		fmt.Printf("%*s #%d %s: %s - %d\n", indent*4, "*", k, f.ID, f.Name, f.Size)
-		// fmt.Println(f.String())
+	itf := func(di *DriveItem) error {
+		n++
+		fmt.Printf("%*s #%d %s: %s - %d\n", indent*4, "*", n, di.ID, di.Name, di.Size)
 
-		if f.Folder != nil {
-			testGetDriveItemChildren(t, gc, indent+1, driveID, f.ID)
+		if di.Folder != nil {
+			return testGetDriveItemChildren(gc, indent+1, driveID, di.ID)
 		}
+		return nil
 	}
+
+	return gc.IterDriveItemChildren(context.TODO(), driveID, itemID, itf, "$expand", "listItem($expand=fields)")
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/askasoft/pango/iox"
 	"github.com/askasoft/pango/log"
 	"github.com/askasoft/pango/log/httplog"
+	"github.com/askasoft/pango/net/urlx"
 	"github.com/askasoft/pango/ret"
 	"github.com/askasoft/pango/str"
 )
@@ -321,29 +322,7 @@ func DoIter[T any](ctx context.Context, gc *GraphClient, url string, itf func(T)
 }
 
 func optionsQuery(options ...string) string {
-	// TODO: return urlx.EncodeQuery(options...)
-	if len(options) == 0 {
-		return ""
-	}
-	return "?" + encodeOptions(options...)
-}
-
-func encodeOptions(options ...string) string {
-	z := len(options)
-	if z == 0 {
-		return ""
-	}
-
-	vs := url.Values{}
-	for i := 0; i < z; i += 2 {
-		k := options[i]
-		v := ""
-		if i+1 < z {
-			v = options[i+1]
-		}
-		vs.Add(k, v)
-	}
-	return vs.Encode()
+	return urlx.EncodeQuery(options...)
 }
 
 func copyResponse(res *http.Response, w io.Writer) error {
