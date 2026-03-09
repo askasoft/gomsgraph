@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/askasoft/pango/log"
+	"github.com/askasoft/pango/log/httplog"
 )
 
 func testNewGraphClient(t *testing.T) *GraphClient {
@@ -28,14 +29,15 @@ func testNewGraphClient(t *testing.T) *GraphClient {
 	}
 
 	logs := log.NewLog()
-	logs.SetLevel(log.LevelInfo)
+	logs.SetLevel(log.LevelDebug)
+	logger := logs.GetLogger("MSG")
+
 	gc := &GraphClient{
 		TenantID:     tenantID,
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
-		Logger:       logs.GetLogger("MSG"),
-		MaxRetries:   1,
-		RetryAfter:   time.Second * 3,
+		Transport:    httplog.LoggingRoundTripper(logger),
+		Retryer:      NewRetryer(logger, 1, time.Second*3),
 	}
 
 	return gc

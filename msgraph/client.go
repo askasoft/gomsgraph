@@ -3,10 +3,10 @@ package msgraph
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,9 +14,10 @@ import (
 
 	"github.com/askasoft/pango/doc/jsonx"
 	"github.com/askasoft/pango/fsu"
+	"github.com/askasoft/pango/gog"
 	"github.com/askasoft/pango/iox"
 	"github.com/askasoft/pango/log"
-	"github.com/askasoft/pango/log/httplog"
+	"github.com/askasoft/pango/net/httpx"
 	"github.com/askasoft/pango/net/urlx"
 	"github.com/askasoft/pango/ret"
 	"github.com/askasoft/pango/str"
@@ -33,6 +34,23 @@ func (c *Credential) IsValid() bool {
 	return c != nil && c.Time.Add(time.Duration(c.ExpiresIn-60)*time.Second).After(time.Now())
 }
 
+// default retry on not canceled error or (status = 429 || (status >= 500 && status <= 599))
+func NewRetryer(logger log.Logger, maxRetries int, retryAfter time.Duration) *ret.Retryer {
+	return &ret.Retryer{
+		MaxRetries: maxRetries,
+		ShouldRetry: func(err error) time.Duration {
+			return gog.If(shouldRetry(err), retryAfter, 0)
+		},
+	}
+}
+
+func shouldRetry(err error) bool {
+	if re, ok := AsResultError(err); ok {
+		return httpx.IsStatusRetryable(re.StatusCode)
+	}
+	return !errors.Is(err, context.Canceled)
+}
+
 type GraphClient struct {
 	TenantID     string
 	ClientID     string
@@ -41,11 +59,7 @@ type GraphClient struct {
 
 	Transport http.RoundTripper
 	Timeout   time.Duration
-	Logger    log.Logger
-
-	MaxRetries  int
-	RetryAfter  time.Duration
-	ShouldRetry func(error) bool // default retry on not canceled error or (status = 429 || (status >= 500 && status <= 599))
+	Retryer   *ret.Retryer
 
 	credential Credential
 }
@@ -54,33 +68,19 @@ func (gc *GraphClient) Endpoint(format string, a ...any) string {
 	return "https://graph.microsoft.com/v1.0" + fmt.Sprintf(format, a...)
 }
 
-func (gc *GraphClient) shouldRetry(err error) bool {
-	sr := gc.ShouldRetry
-	if sr == nil {
-		sr = shouldRetry
-	}
-	return sr(err)
-}
-
-func (gc *GraphClient) call(req *http.Request) (res *http.Response, err error) {
-	client := &http.Client{
+func (gc *GraphClient) call(req *http.Request) (*http.Response, error) {
+	hc := http.Client{
 		Transport: gc.Transport,
 		Timeout:   gc.Timeout,
 	}
-
-	res, err = httplog.TraceClientDo(gc.Logger, client, req)
-	if err != nil {
-		if gc.shouldRetry(err) {
-			err = ret.NewRetryError(err, gc.RetryAfter)
-		}
-		return res, err
-	}
-
-	return res, nil
+	return hc.Do(req)
 }
 
 func (gc *GraphClient) RetryForError(ctx context.Context, api func() error) (err error) {
-	return ret.RetryForError(ctx, api, gc.MaxRetries, gc.Logger)
+	if r := gc.Retryer; r != nil {
+		return r.Do(ctx, api)
+	}
+	return api()
 }
 
 func (gc *GraphClient) authenticate(ctx context.Context, req *http.Request) error {
@@ -100,22 +100,15 @@ func (gc *GraphClient) DoAuth(ctx context.Context) error {
 }
 
 func (gc *GraphClient) doAuth(ctx context.Context) error {
-	vals := url.Values{}
-	vals.Add("client_id", gc.ClientID)
-	vals.Add("client_secret", gc.ClientSecret)
-	vals.Add("grant_type", "client_credentials")
-	vals.Add("scope", str.IfEmpty(gc.Scope, "https://graph.microsoft.com/.default"))
-
 	url := fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", gc.TenantID)
-	//TODO:
-	// val := urlx.EncodeValues(
-	// 	"client_id", gc.ClientID,
-	// 	"client_secret", gc.ClientSecret,
-	// 	"grant_type", "client_credentials",
-	// 	"scope", str.IfEmpty(gc.Scope, "https://graph.microsoft.com/.default"),
-	// )
+	val := urlx.EncodeValues(
+		"client_id", gc.ClientID,
+		"client_secret", gc.ClientSecret,
+		"grant_type", "client_credentials",
+		"scope", str.IfEmpty(gc.Scope, "https://graph.microsoft.com/.default"),
+	)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(vals.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(val))
 	if err != nil {
 		return err
 	}
@@ -138,9 +131,6 @@ func (gc *GraphClient) doAuth(ctx context.Context) error {
 	ae := newAuthError(res)
 	_ = decoder.Decode(ae)
 
-	if gc.shouldRetry(ae) {
-		ae.RetryAfter = gc.RetryAfter
-	}
 	return ae
 }
 
@@ -170,9 +160,6 @@ func (gc *GraphClient) doCall(ctx context.Context, req *http.Request, result any
 	re := newResultError(res)
 	_ = decoder.Decode(re)
 
-	if gc.shouldRetry(re) {
-		re.RetryAfter = gc.RetryAfter
-	}
 	return re
 }
 
