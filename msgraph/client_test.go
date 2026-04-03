@@ -37,7 +37,7 @@ func testNewGraphClient(t *testing.T) *GraphClient {
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Transport:    httplog.LoggingRoundTripper(logger),
-		Retryer:      NewRetryer(logger, 1, time.Second*3),
+		Retryer:      NewRetryer(time.Second*3, 1, logger),
 	}
 
 	return gc
